@@ -1,5 +1,7 @@
 # CL-Cookie
 
+[![Build Status](https://travis-ci.org/fukamachi/cl-cookie.svg?branch=master)](https://travis-ci.org/fukamachi/cl-cookie)
+
 HTTP cookie manager for Common Lisp.
 
 ## Usage
