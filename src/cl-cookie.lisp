@@ -209,9 +209,18 @@
             (skip* #\Space)
             (match-i-case
              ("expires" (skip #\=)
-                        (bind (expires (skip* (not #\;)))
+                        ;; Assume there're both the Max-Age and the Expires attribute if cookie-expires has already set.
+                        ;; In that case, just ignores Expires header.
+                        (if (cookie-expires cookie)
+                            (skip* (not #\;))
+                            (bind (expires (skip* (not #\;)))
+                              (setf (cookie-expires cookie)
+                                    (parse-cookie-date expires)))))
+             ("max-age" (skip #\=)
+                        (bind (max-age (skip* (not #\;)))
                           (setf (cookie-expires cookie)
-                                (parse-cookie-date expires))))
+                                (+ (get-universal-time)
+                                   (parse-integer max-age)))))
              ("path" (skip #\=)
                      (bind (path (skip* (not #\;)))
                        (setf (cookie-path cookie) path)))
