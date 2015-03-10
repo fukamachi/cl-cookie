@@ -210,12 +210,17 @@
                                   collect `(,vec))))
                       (match-case (&rest cases)
                         `(vector-case (,',data :start ,',p)
-                           ,@cases
-                           (otherwise (error 'match-failed))))
+                           ,@(if (find 'otherwise cases :key #'car :test #'eq)
+                                 cases
+                                 (append cases
+                                         '((otherwise (error 'match-failed)))
+                                         ))))
                       (match-i-case (&rest cases)
                         `(vector-case (,',data :start ,',p :case-insensitive t)
-                           ,@cases
-                           (otherwise (error 'match-failed)))))
+                           ,@(if (find 'otherwise cases :key #'car :test #'eq)
+                                 cases
+                                 (append cases
+                                         '((otherwise (error 'match-failed))))))))
              (flet ((eofp ()
                       (<= ,g-end ,p))
                     (current () ,elem)

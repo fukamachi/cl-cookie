@@ -228,7 +228,11 @@
                        (bind (domain (skip* (not #\;)))
                          (setf (cookie-domain cookie) domain)))
              ("secure" (setf (cookie-secure-p cookie) t))
-             ("httponly" (setf (cookie-httponly-p cookie) t)))
+             ("httponly" (setf (cookie-httponly-p cookie) t))
+             (otherwise ;; Ignore unknown attributes
+              (skip* (not #\=))
+              (skip #\=)
+              (skip* (not #\;))))
             (skip? #\;)))
       (match-failed ()
         (error 'invalid-set-cookie :header set-cookie-string)))
