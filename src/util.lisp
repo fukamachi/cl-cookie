@@ -126,7 +126,7 @@
                            (incf ,',p ,step)
                            ,@(if (= step 0)
                                  ()
-                                 `((when (= ,',g-end ,',p)
+                                 `((when (<= ,',g-end ,',p)
                                      (error 'eof))
                                    (setq ,',elem
                                          (aref ,',data ,',p))))))
@@ -217,7 +217,7 @@
                            ,@cases
                            (otherwise (error 'match-failed)))))
              (flet ((eofp ()
-                      (= ,g-end ,p))
+                      (<= ,g-end ,p))
                     (current () ,elem)
                     (pos () ,p))
                (handler-case
