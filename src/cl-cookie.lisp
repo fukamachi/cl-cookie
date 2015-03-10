@@ -65,10 +65,12 @@
   (delete-old-cookies cookie-jar)
   (remove-if-not
    (lambda (cookie)
-     (and (or (not securep)
-              (cookie-secure-p cookie))
-          (or (not path)
-              (string= path (cookie-path cookie)))
+     (and (if (cookie-secure-p cookie)
+              securep
+              t)
+          (or (not (cookie-path cookie))
+              (and path
+                   (string= path (cookie-path cookie))))
           (cookie-domain-p host (cookie-domain cookie))))
    (cookie-jar-cookies cookie-jar)))
 
