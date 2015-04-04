@@ -1,5 +1,7 @@
 language: common-lisp
 
+sudo: true
+
 env:
   matrix:
     - LISP=sbcl
