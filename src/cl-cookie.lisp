@@ -2,7 +2,7 @@
 (defpackage cl-cookie
   (:nicknames :cookie)
   (:use :cl
-        :cl-cookie.util)
+        :proc-parse)
   (:import-from :quri
                 :cookie-domain-p)
   (:import-from :alexandria
@@ -128,7 +128,7 @@
 (defun parse-cookie-date (cookie-date)
   (let (year month day hour min sec offset)
     (handler-case
-        (with-vector-parsing (cookie-date)
+        (with-string-parsing (cookie-date)
           (labels ((parse-month ()
                      (if (integer-char-p (current))
                          (parse-int)
@@ -197,7 +197,7 @@
 (defun parse-set-cookie-header (set-cookie-string)
   (let ((cookie (make-cookie)))
     (handler-case
-        (with-vector-parsing (set-cookie-string)
+        (with-string-parsing (set-cookie-string)
           (bind (name (skip+ (not #\=)))
             (setf (cookie-name cookie) name))
           (skip #\=)
@@ -233,7 +233,8 @@
               (skip* (not #\=))
               (skip #\=)
               (skip* (not #\;))))
-            (skip? #\;)))
+            (skip? #\;)
+            (when (eofp) (return))))
       (match-failed ()
         (error 'invalid-set-cookie :header set-cookie-string)))
     cookie))

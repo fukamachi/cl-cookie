@@ -16,14 +16,12 @@
   :version "0.1"
   :author "Eitaro Fukamachi"
   :license "BSD 2-Clause"
-  :depends-on (:cl-ppcre
+  :depends-on (:proc-parse
+               :cl-ppcre
                :quri
                :local-time
                :alexandria)
-  :components ((:module "src"
-                :components
-                ((:file "cl-cookie" :depends-on ("util"))
-                 (:file "util"))))
+  :components ((:file "src/cl-cookie"))
   :description "HTTP cookie manager"
   :long-description
   #.(with-open-file (stream (merge-pathnames
