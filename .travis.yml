@@ -19,6 +19,7 @@ install:
 
 before_script:
   - git clone https://github.com/fukamachi/quri ~/lisp/quri
+  - git clone https://github.com/fukamachi/proc-parse ~/lisp/proc-parse
 
 script:
   - cl -l prove
