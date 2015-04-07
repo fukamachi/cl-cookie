@@ -128,7 +128,7 @@
 (defun parse-cookie-date (cookie-date)
   (let (year month day hour min sec offset)
     (handler-case
-        (with-string-parsing (cookie-date)
+        (with-vector-parsing (cookie-date)
           (labels ((parse-month ()
                      (if (integer-char-p (current))
                          (parse-int)
@@ -197,7 +197,7 @@
 (defun parse-set-cookie-header (set-cookie-string)
   (let ((cookie (make-cookie)))
     (handler-case
-        (with-string-parsing (set-cookie-string)
+        (with-vector-parsing (set-cookie-string)
           (bind (name (skip+ (not #\=)))
             (setf (cookie-name cookie) name))
           (skip #\=)
@@ -233,8 +233,7 @@
               (skip* (not #\=))
               (skip #\=)
               (skip* (not #\;))))
-            (skip? #\;)
-            (when (eofp) (return))))
+            (skip? #\;)))
       (match-failed ()
         (error 'invalid-set-cookie :header set-cookie-string)))
     cookie))
