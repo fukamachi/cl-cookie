@@ -106,7 +106,7 @@
 (define-condition invalid-expires-date (error)
   ((expires :initarg :expires))
   (:report (lambda (condition stream)
-             (format stream "Invalid expires date: ~S"
+             (format stream "Invalid expires date: ~S. Ignoring."
                      (slot-value condition 'expires)))))
 
 (defun integer-char-p (char)
@@ -148,6 +148,7 @@
                    (parse-int ()
                      (bind (int (skip-while integer-char-p))
                        (parse-integer int))))
+            (skip? #\")
             (match-case
              ("Sun" (match? "day"))
              ("Mon" (match? "day"))
@@ -186,6 +187,7 @@
             (skip #\Space)
             (bind (tz-abbrev (skip-while alpha-char-p))
               (setq offset (get-tz-offset tz-abbrev))
+              (skip? #\")
               (return-from parse-cookie-date
                 (local-time:timestamp-to-universal
                  (local-time:encode-timestamp 0 sec min hour day month year :timezone local-time:+gmt-zone+
@@ -235,5 +237,8 @@
               (skip* (not #\;))))
             (skip? #\;)))
       (match-failed ()
-        (error 'invalid-set-cookie :header set-cookie-string)))
+        (error 'invalid-set-cookie :header set-cookie-string))
+      (invalid-expires-date (e)
+        (warn (princ-to-string e))
+        (return-from parse-set-cookie-header nil)))
     cookie))
