@@ -18,19 +18,19 @@
     (ok (parse-cookie-date date) date)))
 
 (subtest "parse-set-cookie-header"
-  (is (parse-set-cookie-header "SID=31d4d96e407aad42")
+  (is (parse-set-cookie-header "SID=31d4d96e407aad42" "example.com")
       (make-cookie :name "SID" :value "31d4d96e407aad42")
       :test #'cookie=
       "name and value")
-  (is (parse-set-cookie-header "SID=")
+  (is (parse-set-cookie-header "SID=" "example.com")
       (make-cookie :name "SID" :value "")
       :test #'cookie=
       "no value")
-  (is (parse-set-cookie-header "SID=31d4d96e407aad42; Path=/; Domain=example.com")
+  (is (parse-set-cookie-header "SID=31d4d96e407aad42; Path=/; Domain=example.com" "example.com")
       (make-cookie :name "SID" :value "31d4d96e407aad42" :path "/" :domain "example.com")
       :test #'cookie=
       "path and domain")
-  (is (parse-set-cookie-header "SID=31d4d96e407aad42; Path=/; Secure; HttpOnly")
+  (is (parse-set-cookie-header "SID=31d4d96e407aad42; Path=/; Secure; HttpOnly" "example.com")
       (make-cookie :name "SID" :value "31d4d96e407aad42" :path "/" :secure-p t :httponly-p t)
       :test #'cookie-equal
       "secure and httponly"))

@@ -20,6 +20,7 @@
            :cookie-domain
            :cookie-secure-p
            :cookie-httponly-p
+           :cookie-origin-host
            :cookie-jar
            :make-cookie-jar
            :cookie-jar-cookies
@@ -34,7 +35,8 @@
   path
   domain
   secure-p
-  httponly-p)
+  httponly-p
+  origin-host)
 
 (defstruct cookie-jar
   cookies)
@@ -71,7 +73,9 @@
           (or (not (cookie-path cookie))
               (and path
                    (string= path (cookie-path cookie))))
-          (cookie-domain-p host (cookie-domain cookie))))
+          (if (cookie-domain cookie)
+              (cookie-domain-p host (cookie-domain cookie))
+              (string= host (cookie-origin-host cookie)))))
    (cookie-jar-cookies cookie-jar)))
 
 (defun write-cookie-header (cookies &optional stream)
@@ -196,8 +200,9 @@
         (error 'invalid-expires-date
                :expires cookie-date)))))
 
-(defun parse-set-cookie-header (set-cookie-string)
-  (let ((cookie (make-cookie)))
+(defun parse-set-cookie-header (set-cookie-string origin-host)
+  (check-type origin-host string)
+  (let ((cookie (make-cookie :origin-host origin-host)))
     (handler-case
         (with-vector-parsing (set-cookie-string)
           (bind (name (skip+ (not #\=)))
