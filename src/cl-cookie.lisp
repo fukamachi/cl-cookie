@@ -17,7 +17,8 @@
                 :subzone-offset
                 :+gmt-zone+)
   (:import-from :alexandria
-                :ensure-cons)
+                :ensure-cons
+                :starts-with-subseq)
   (:export :parse-set-cookie-header
            :write-cookie-header
            :cookie
@@ -55,8 +56,11 @@
 (defun cookie= (cookie1 cookie2)
   (and (string= (cookie-name cookie1)
                 (cookie-name cookie2))
-       (string= (cookie-domain cookie1)
-                (cookie-domain cookie2))
+       (if (cookie-domain cookie1)
+           (equalp (cookie-domain cookie1)
+                   (cookie-domain cookie2))
+           (equalp (cookie-origin-host cookie1)
+                   (cookie-origin-host cookie2)))
        (equal (cookie-path cookie1)
               (cookie-path cookie2))))
 
@@ -74,20 +78,32 @@
         (delete-if #'expired-cookie-p
                    (cookie-jar-cookies cookie-jar))))
 
-(defun cookie-jar-host-cookies (cookie-jar host &key path securep)
+(defun match-cookie-path (request-path cookie-path)
+  (flet ((last-char (str)
+           (aref str (1- (length str)))))
+    (when (= 0 (length request-path))
+      (setf request-path "/"))
+    (when (= 0 (length cookie-path))
+      (setf cookie-path "/"))
+    (or (string= request-path cookie-path)
+        (and (starts-with-subseq cookie-path request-path)
+             (or (char= (last-char cookie-path) #\/)
+                 (char= (aref request-path (length cookie-path)) #\/))))))
+
+(defun match-cookie (cookie host path &key securep)
+  (and (if (cookie-secure-p cookie)
+           securep
+           t)
+       (match-cookie-path path (cookie-path cookie))
+       (if (cookie-domain cookie)
+           (cookie-domain-p host (cookie-domain cookie))
+           (equalp host (cookie-origin-host cookie)))))
+
+(defun cookie-jar-host-cookies (cookie-jar host path &key securep)
   (delete-old-cookies cookie-jar)
-  (remove-if-not
-   (lambda (cookie)
-     (and (if (cookie-secure-p cookie)
-              securep
-              t)
-          (or (not (cookie-path cookie))
-              (and path
-                   (string= path (cookie-path cookie))))
-          (if (cookie-domain cookie)
-              (cookie-domain-p host (cookie-domain cookie))
-              (string= host (cookie-origin-host cookie)))))
-   (cookie-jar-cookies cookie-jar)))
+  (remove-if-not (lambda (cookie)
+                   (match-cookie cookie host path :securep securep))
+                 (cookie-jar-cookies cookie-jar)))
 
 (defun write-cookie-header (cookies &optional stream)
   (labels ((write-cookie (cookie s)
@@ -218,9 +234,9 @@
         (error 'invalid-expires-date
                :expires cookie-date)))))
 
-(defun parse-set-cookie-header (set-cookie-string origin-host)
+(defun parse-set-cookie-header (set-cookie-string origin-host origin-path)
   (check-type origin-host string)
-  (let ((cookie (make-cookie :origin-host origin-host)))
+  (let ((cookie (make-cookie :origin-host origin-host :path origin-path)))
     (handler-case
         (with-vector-parsing (set-cookie-string)
           (bind (name (skip+ (not #\=)))
