@@ -129,6 +129,9 @@
               when (equal tz-abbrev (local-time::subzone-abbrev sub))
                 do (return (local-time::subzone-offset sub)))))))
 
+(defvar *current-century* (local-time:timestamp-century
+                           (local-time:today)))
+
 (defun parse-cookie-date (cookie-date)
   (let (year month day hour min sec offset)
     (handler-case
@@ -192,6 +195,11 @@
             (bind (tz-abbrev (skip-while alpha-char-p))
               (setq offset (get-tz-offset tz-abbrev))
               (skip? #\")
+              ;; Shorthand year, default to current century
+              (when (< year 100)
+                (setq year (+ year
+                              (* (1- *current-century*)
+                                 100))))
               (return-from parse-cookie-date
                 (local-time:timestamp-to-universal
                  (local-time:encode-timestamp 0 sec min hour day month year :timezone local-time:+gmt-zone+
