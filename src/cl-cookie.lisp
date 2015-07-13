@@ -5,6 +5,17 @@
         :proc-parse)
   (:import-from :quri
                 :cookie-domain-p)
+  (:import-from :local-time
+                :today
+                :timestamp-century
+                :timestamp-to-universal
+                :encode-timestamp
+                :*abbreviated-subzone-name->timezone-list*
+                :reread-timezone-repository
+                :timezone-subzones
+                :subzone-abbrev
+                :subzone-offset
+                :+gmt-zone+)
   (:import-from :alexandria
                 :ensure-cons)
   (:export :parse-set-cookie-header
@@ -129,6 +140,10 @@
               when (equal tz-abbrev (local-time::subzone-abbrev sub))
                 do (return (local-time::subzone-offset sub)))))))
 
+(defparameter *current-century-offset*
+  (* (1- (timestamp-century (today)))
+     100))
+
 (defun parse-cookie-date (cookie-date)
   (let (year month day hour min sec offset)
     (handler-case
@@ -192,6 +207,9 @@
             (bind (tz-abbrev (skip-while alpha-char-p))
               (setq offset (get-tz-offset tz-abbrev))
               (skip? #\")
+              ;; Shorthand year, default to current century
+              (when (< year 100)
+                (incf year *current-century-offset*))
               (return-from parse-cookie-date
                 (local-time:timestamp-to-universal
                  (local-time:encode-timestamp 0 sec min hour day month year :timezone local-time:+gmt-zone+
