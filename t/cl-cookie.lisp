@@ -10,12 +10,16 @@
 (plan nil)
 
 (subtest "parse-cookie-date"
-  (dolist (date (list "Wed, 06-Feb-2008 21:01:38 GMT"
-                      "Wed, 06-Feb-08 21:01:38 GMT"
-                      "Tue Feb 13 08:00:00 2007 GMT"
-                      "Wednesday, 07-February-2027 08:55:23 GMT"
-                      "Wed, 07-02-2017 10:34:45 GMT"))
-    (ok (parse-cookie-date date) date)))
+  (loop for (date . rfc3339) in '(("Wed, 06-Feb-2008 21:01:38 GMT" . "2008-02-06T21:01:38+0000")
+                                  ("Wed, 06-Feb-08 21:01:38 GMT"   . "2008-02-06T21:01:38+0000")
+                                  ("Tue Feb 13 08:00:00 2007 GMT"  . "2007-02-13T08:00:00+0000")
+                                  ("Wednesday, 07-February-2027 08:55:23 GMT" . "2027-02-07T08:55:23+0000")
+                                  ("Wed, 07-02-2017 10:34:45 GMT"  . "2017-02-07T10:34:45+0000"))
+        do (let ((parsed (parse-cookie-date date)))
+             (ok parsed (format nil "Can parse ~S" date))
+             (is (local-time:universal-to-timestamp parsed)
+                 (local-time:parse-timestring rfc3339)
+                 :test #'local-time:timestamp=))))
 
 (subtest "parse-set-cookie-header"
   (is (parse-set-cookie-header "SID=31d4d96e407aad42" "example.com")
