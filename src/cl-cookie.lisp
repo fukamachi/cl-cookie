@@ -9,6 +9,8 @@
                 :today
                 :timestamp-century
                 :timestamp-to-universal
+                :universal-to-timestamp
+                :format-timestring
                 :encode-timestamp
                 :*abbreviated-subzone-name->timezone-list*
                 :reread-timezone-repository
@@ -21,6 +23,7 @@
                 :starts-with-subseq)
   (:export :parse-set-cookie-header
            :write-cookie-header
+           :write-set-cookie-header
            :cookie
            :make-cookie
            :cookie=
@@ -120,6 +123,26 @@
           (main (ensure-cons cookies) stream)
           (with-output-to-string (s)
             (main (ensure-cons cookies) s))))))
+
+(defparameter +set-cookie-date-format+
+  '(:short-weekday ", " (:day 2) #\space :short-month #\space (:year 4) #\space
+    (:hour 2) #\: (:min 2) #\: (:sec 2) #\space "GMT")
+  "The date format used in RFC 6265. For example: Wed, 09 Jun 2021 10:18:14 GMT.")
+
+(defun write-set-cookie-header (cookie &optional stream)
+  (labels ((format-cookie-date (universal-time s)
+             (when universal-time
+               (format-timestring s (universal-to-timestamp universal-time)
+                                  :format +set-cookie-date-format+ :timezone local-time:+gmt-zone+))))
+    (format stream
+            "~A=~A~@[; Expires=~A~]~@[; Path=~A~]~@[; Domain=~A~]~:[~;; Secure~]~:[~;; HttpOnly~]"
+            (cookie-name cookie)
+            (cookie-value cookie)
+            (format-cookie-date (cookie-expires cookie) stream)
+            (cookie-path cookie)
+            (cookie-domain cookie)
+            (cookie-secure-p cookie)
+            (cookie-httponly-p cookie))))
 
 (defun merge-cookies (cookie-jar cookies)
   (setf (cookie-jar-cookies cookie-jar)
