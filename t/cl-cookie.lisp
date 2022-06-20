@@ -132,4 +132,26 @@
                      (list (make-cookie :name "name" :value "Ultraman" :domain ".com")))
       (is (cookie-jar-host-cookies cookie-jar "hatena.com" "/") nil))))
 
+(subtest "write-set-cookie-header"
+  (is (write-set-cookie-header (make-cookie :name "SID" :value "31d4d96e407aad42"))
+      "SID=31d4d96e407aad42"
+      :test #'string=
+      "name and value")
+  (is (write-set-cookie-header (make-cookie :name "SID" :value "31d4d96e407aad42" :domain "www.example.com"))
+      "SID=31d4d96e407aad42; Domain=www.example.com"
+      :test #'string=
+      "name, value, and domain")
+  (is (write-set-cookie-header (make-cookie :name "SID" :value "31d4d96e407aad42" :domain "www.example.com" :path "/users"))
+      "SID=31d4d96e407aad42; Path=/users; Domain=www.example.com"
+      :test #'string=
+      "name, value, domain, and path")
+  (is (write-set-cookie-header (make-cookie :name "SID" :value "31d4d96e407aad42" :expires (encode-universal-time 6 22 19 25 1 2002)))
+      "SID=31d4d96e407aad42; Expires=Sat, 26 Jan 2002 00:22:06 GMT"
+      :test #'string=
+      "name, value, and expires")
+  (is (write-set-cookie-header (make-cookie :name "SID" :value "31d4d96e407aad42" :expires (encode-universal-time 6 22 19 25 1 2002)
+                                            :secure-p t :httponly-p t))
+      "SID=31d4d96e407aad42; Expires=Sat, 26 Jan 2002 00:22:06 GMT; Secure; HttpOnly"
+      :test #'string=))
+
 (finalize)
