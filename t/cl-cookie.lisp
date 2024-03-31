@@ -145,13 +145,13 @@
       "SID=31d4d96e407aad42; Path=/users; Domain=www.example.com"
       :test #'string=
       "name, value, domain, and path")
-  (is (write-set-cookie-header (make-cookie :name "SID" :value "31d4d96e407aad42" :expires (encode-universal-time 6 22 19 25 1 2002)))
-      "SID=31d4d96e407aad42; Expires=Sat, 26 Jan 2002 00:22:06 GMT"
+  (is (write-set-cookie-header (make-cookie :name "SID" :value "31d4d96e407aad42" :expires (encode-universal-time 6 22 19 25 1 2002 0)))
+      "SID=31d4d96e407aad42; Expires=Fri, 25 Jan 2002 19:22:06 GMT"
       :test #'string=
       "name, value, and expires")
-  (is (write-set-cookie-header (make-cookie :name "SID" :value "31d4d96e407aad42" :expires (encode-universal-time 6 22 19 25 1 2002)
+  (is (write-set-cookie-header (make-cookie :name "SID" :value "31d4d96e407aad42" :expires (encode-universal-time 6 22 19 25 1 2002 0)
                                             :secure-p t :httponly-p t))
-      "SID=31d4d96e407aad42; Expires=Sat, 26 Jan 2002 00:22:06 GMT; Secure; HttpOnly"
+      "SID=31d4d96e407aad42; Expires=Fri, 25 Jan 2002 19:22:06 GMT; Secure; HttpOnly"
       :test #'string=))
 
 (finalize)
