@@ -4,6 +4,7 @@
         :cl-cookie
         :prove)
   (:import-from :cl-cookie
+		:expired-cookie-p
                 :parse-cookie-date
                 :match-cookie-path
                 :match-cookie))
@@ -36,6 +37,16 @@
       (make-cookie :name "SID" :value "31d4d96e407aad42" :origin-host "example.com" :path "/" :domain "example.com")
       :test #'cookie=
       "path and domain")
+  (is (parse-set-cookie-header "SID=31d4d96e407aad42; Expires=Fri, 25 Jan 2002 19:22:06 GMT; Max-age=199999; Path=/"
+			       "example.com" "/")
+      (make-cookie :name "SID" :value "31d4d96e407aad42" :origin-host "example.com" :path "/" :max-age 199999 :expires (encode-universal-time 6 22 19 25 1 2002 0))
+      :test #'cookie-equal
+      "expires and max-age")
+  (is (parse-set-cookie-header "SID=31d4d96e407aad42; Max-age=199999; Path=/; SameSite=Lax; Partitioned"
+			       "example.com" "/")
+      (make-cookie :name "SID" :value "31d4d96e407aad42" :origin-host "example.com" :path "/" :partitioned t :max-age 199999 :same-site "Lax")
+      :test #'cookie-equal
+      "partitioned max-age and same-site")
   (is (parse-set-cookie-header "SID=31d4d96e407aad42; Path=/; Secure; HttpOnly" "example.com" "/")
       (make-cookie :name "SID" :value "31d4d96e407aad42" :origin-host "example.com" :path "/" :secure-p t :httponly-p t)
       :test #'cookie-equal
@@ -149,9 +160,29 @@
       "SID=31d4d96e407aad42; Expires=Fri, 25 Jan 2002 19:22:06 GMT"
       :test #'string=
       "name, value, and expires")
+  (is (write-set-cookie-header (make-cookie :name "SID" :value "31d4d96e407aad42" :max-age 3600 :same-site "Strict" :partitioned t))
+      "SID=31d4d96e407aad42; Max-age=3600; SameSite=Strict; Partitioned"
+      :test #'string=
+      "max-age, same-site, partitioned")
   (is (write-set-cookie-header (make-cookie :name "SID" :value "31d4d96e407aad42" :expires (encode-universal-time 6 22 19 25 1 2002 0)
                                             :secure-p t :httponly-p t))
       "SID=31d4d96e407aad42; Expires=Fri, 25 Jan 2002 19:22:06 GMT; Secure; HttpOnly"
       :test #'string=))
+
+(subtest "expired-cookie-p"
+  (is (expired-cookie-p
+       (make-cookie :name "SID" :value "31d4d96e407aad42" :expires (encode-universal-time 6 22 19 25 1 2002 0)
+		    :secure-p t :httponly-p t))
+      t)
+  (is (expired-cookie-p
+       (make-cookie :name "SID" :value "31d4d96e407aad42" :expires (encode-universal-time 6 22 19 25 1 2002 0) :max-age 10000000000
+                                            :secure-p t :httponly-p t))
+      nil)
+  (is (expired-cookie-p
+       (make-cookie :name "SID" :value "31d4d96e407aad42" :expires (encode-universal-time 6 22 19 25 1 2300 0) :max-age 10000000
+                                            :secure-p t :httponly-p t))
+      nil)
+  (is (expired-cookie-p (make-cookie :name "SID" :value "31d4d96e407aad42"))
+      nil))
 
 (finalize)

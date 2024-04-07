@@ -20,6 +20,8 @@
                 :+gmt-zone+)
   (:import-from :alexandria
                 :ensure-cons
+		:if-let
+		:when-let
                 :starts-with-subseq)
   (:export :parse-set-cookie-header
            :write-cookie-header
@@ -33,6 +35,9 @@
            :cookie-expires
            :cookie-path
            :cookie-domain
+	   :cookie-same-site
+           :cookie-max-age
+	   :cookie-partitioned
            :cookie-secure-p
            :cookie-httponly-p
            :cookie-origin-host
@@ -43,20 +48,32 @@
            :merge-cookies))
 (in-package :cl-cookie)
 
+(defun same-site-p (same-site)
+  "Predicate for allowed values of same-site attribute"
+  (member same-site (list "Strict" "Lax" "None") :test #'string-equal))
+
+(deftype same-site nil
+  '(satisfies same-site-p))
+
 (defstruct cookie
-  name
-  value
-  expires
-  path
-  domain
-  secure-p
-  httponly-p
-  origin-host)
+  (name nil :type (or null string))
+  (value nil :type (or null string))
+  (path nil :type (or null string))
+  (domain nil :type (or null string))
+  (origin-host nil :type (or null string))
+  (expires nil :type (or null integer))
+  (max-age nil :type (or null integer))
+  (same-site nil :type (or null same-site))
+  (partitioned nil :type boolean)
+  (secure-p nil :type boolean)
+  (httponly-p nil :type boolean)
+  (creation-timestamp (get-universal-time) :type integer :read-only t))
 
 (defstruct cookie-jar
   cookies)
 
 (defun cookie= (cookie1 cookie2)
+  "Equality check for the attributes name, domain, host and path."
   (and (string= (cookie-name cookie1)
                 (cookie-name cookie2))
        (if (cookie-domain cookie1)
@@ -68,13 +85,25 @@
               (cookie-path cookie2))))
 
 (defun cookie-equal (cookie1 cookie2)
+  "Equality check as in cookie= plus also secure-p, same-site, partitioned, as well as httponly-p."
   (and (cookie= cookie1 cookie2)
        (eq (cookie-secure-p cookie1) (cookie-secure-p cookie2))
+       (string= (cookie-same-site cookie1)
+		(cookie-same-site cookie2))
+       (eq (cookie-partitioned cookie1)
+	   (cookie-partitioned cookie2))
        (eq (cookie-httponly-p cookie1) (cookie-httponly-p cookie2))))
 
 (defun expired-cookie-p (cookie)
-  (and (cookie-expires cookie)
-       (< (cookie-expires cookie) (get-universal-time))))
+  "Check if cookie is expired, whereas max-age has priority over expires."
+  (if-let (max-age
+	   (cookie-max-age cookie))
+    (< (+ max-age
+	  (cookie-creation-timestamp cookie))
+       (get-universal-time))
+    (when-let (expires
+	       (cookie-expires cookie))
+      (< expires (get-universal-time)))))
 
 (defun delete-old-cookies (cookie-jar)
   (setf (cookie-jar-cookies cookie-jar)
@@ -94,6 +123,7 @@
                  (char= (aref request-path (length cookie-path)) #\/))))))
 
 (defun match-cookie (cookie host path &key securep)
+  "Get all available cookies for a specific host and path."
   (and (if (cookie-secure-p cookie)
            securep
            t)
@@ -130,17 +160,21 @@
   "The date format used in RFC 6265. For example: Wed, 09 Jun 2021 10:18:14 GMT.")
 
 (defun write-set-cookie-header (cookie &optional stream)
+  "Writes full header in conformance with RFC 6265 plus some additional attributes."
   (labels ((format-cookie-date (universal-time s)
              (when universal-time
                (format-timestring s (universal-to-timestamp universal-time)
                                   :format +set-cookie-date-format+ :timezone local-time:+gmt-zone+))))
     (format stream
-            "~A=~A~@[; Expires=~A~]~@[; Path=~A~]~@[; Domain=~A~]~:[~;; Secure~]~:[~;; HttpOnly~]"
+            "~A=~A~@[; Expires=~A~]~@[; Max-age=~A~]~@[; Path=~A~]~@[; Domain=~A~]~@[; SameSite=~A~]~:[~;; Partitioned~]~:[~;; Secure~]~:[~;; HttpOnly~]"
             (cookie-name cookie)
             (cookie-value cookie)
             (format-cookie-date (cookie-expires cookie) stream)
+	    (cookie-max-age cookie)
             (cookie-path cookie)
             (cookie-domain cookie)
+	    (cookie-same-site cookie)
+	    (cookie-partitioned cookie)
             (cookie-secure-p cookie)
             (cookie-httponly-p cookie))))
 
@@ -259,6 +293,8 @@
                :expires cookie-date)))))
 
 (defun parse-set-cookie-header (set-cookie-string origin-host origin-path)
+  "Parse cookie header string and return a cookie struct instance populated with
+the respective slots."
   (check-type origin-host string)
   (let ((cookie (make-cookie :origin-host origin-host :path origin-path)))
     (handler-case
@@ -269,7 +305,6 @@
           (bind (value (skip* (not #\;)))
             (setf (cookie-value cookie) value))
           (skip #\;)
-
           (loop
             (skip* #\Space)
             (match-i-case
@@ -283,15 +318,18 @@
                                     (parse-cookie-date expires)))))
              ("max-age" (skip #\=)
                         (bind (max-age (skip* (not #\;)))
-                          (setf (cookie-expires cookie)
-                                (+ (get-universal-time)
-                                   (parse-integer max-age)))))
+                          (setf (cookie-max-age cookie)
+                                (parse-integer max-age))))
              ("path" (skip #\=)
                      (bind (path (skip* (not #\;)))
                        (setf (cookie-path cookie) path)))
              ("domain" (skip #\=)
                        (bind (domain (skip* (not #\;)))
                          (setf (cookie-domain cookie) domain)))
+             ("samesite" (skip #\=)
+                       (bind (samesite (skip* (not #\;)))
+                         (setf (cookie-same-site cookie) samesite)))
+	     ("partitioned" (setf (cookie-partitioned cookie) t))
              ("secure" (setf (cookie-secure-p cookie) t))
              ("httponly" (setf (cookie-httponly-p cookie) t))
              (otherwise ;; Ignore unknown attributes
