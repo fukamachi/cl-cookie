@@ -22,6 +22,17 @@
 	     (ok (timestamp= (local-time:universal-to-timestamp parsed)
 			     (parse-timestring rfc3339))))))
 
+(deftest make-cookie
+  (signals (make-cookie :value "asdg")
+      'invalid-cookie)
+  (signals (make-cookie :name "haalllo" :value "asdg" :same-site "None")
+      'invalid-cookie)
+  (ok (not (null (make-cookie :name "haalllo" :value "asdg" :same-site "None" :sanity-check nil))))
+  (signals (make-cookie :name "haalllo" :partitioned t)
+      'invalid-cookie)
+  (ok (not (null (let ((*sanity-check* nil))
+		   (make-cookie :name "haalllo" :partitioned t))))))
+
 (deftest parse-set-cookie-header
   (ok (cookie= (parse-set-cookie-header "SID=31d4d96e407aad42" "example.com" "/")
 	       (make-cookie :name "SID" :value "31d4d96e407aad42" :origin-host "example.com" :path "/"))
@@ -36,13 +47,17 @@
 					     "example.com" "/")
 		    (make-cookie :name "SID" :value "31d4d96e407aad42" :origin-host "example.com" :path "/" :max-age 199999 :expires (encode-universal-time 6 22 19 25 1 2002 0)))
       "expires and max-age")
-  (ok (cookie-equal (parse-set-cookie-header "SID=31d4d96e407aad42; Max-age=199999; Path=/; SameSite=Lax; Partitioned"
+  (ok (cookie-equal (parse-set-cookie-header "SID=31d4d96e407aad42; Max-age=199999; Path=/; Secure; SameSite=Lax; Partitioned"
 					     "example.com" "/")
-		    (make-cookie :name "SID" :value "31d4d96e407aad42" :origin-host "example.com" :path "/" :partitioned t :max-age 199999 :same-site "Lax"))
-      "partitioned max-age and same-site")
-  (ok (cookie-equal (parse-set-cookie-header "SID=31d4d96e407aad42; Path=/; Secure; HttpOnly" "example.com" "/")
-		    (make-cookie :name "SID" :value "31d4d96e407aad42" :origin-host "example.com" :path "/" :secure-p t :httponly-p t))
-      "secure and httponly"))
+		    (make-cookie :name "SID" :value "31d4d96e407aad42" :origin-host "example.com" :path "/" :partitioned t :secure-p t :max-age 199999 :same-site "Lax"))
+      "partitioned, max-age, secure, and same-site")
+  (signals (parse-set-cookie-header "SID=31d4d96e407aad42; Max-age=199999; Path=/; SameSite=Lax; Partitioned"
+				    "example.com" "/"))
+  (ok (cookie-equal (parse-set-cookie-header "SID=31d4d96e407aad42; Max-age=199999; Path=/; Secure; SameSite=Lax; Partitioned; Secure"
+					     "example.com" "/")
+		    (make-cookie :name "SID" :value "31d4d96e407aad42" :origin-host "example.com" :path "/" :partitioned t :secure-p t :max-age 199999 :same-site "Lax")))
+  (signals (cl-cookie:parse-set-cookie-header "SID=31d4d96e407aad42; Path=/; HttpOnly; Partitioned" "example.com" "/")
+      'invalid-cookie))
 
 (deftest write-cookie-header
   (ng (write-cookie-header nil))
@@ -143,9 +158,18 @@
   (ok (string= (write-set-cookie-header (make-cookie :name "SID" :value "31d4d96e407aad42" :expires (encode-universal-time 6 22 19 25 1 2002 0)))
 	       "SID=31d4d96e407aad42; Expires=Fri, 25 Jan 2002 19:22:06 GMT")
       "name, value, and expires")
-  (ok (string= (write-set-cookie-header (make-cookie :name "SID" :value "31d4d96e407aad42" :max-age 3600 :same-site "Strict" :partitioned t))
+  (ok (string= (write-set-cookie-header (make-cookie :name "SID" :value "31d4d96e407aad42" :max-age 3600 :same-site "Strict" :secure-p t :partitioned t))
+	       "SID=31d4d96e407aad42; Max-age=3600; SameSite=Strict; Partitioned; Secure")
+      "max-age, same-site, partitioned, secure")
+  (signals (write-set-cookie-header (make-cookie :name "SID" :value "31d4d96e407aad42" :max-age 3600 :same-site "Strict" :partitioned t))
+      (quote error))
+  (ok (string= (write-set-cookie-header (make-cookie :name "SID" :value "31d4d96e407aad42" :max-age 3600 :same-site "Strict" :partitioned t :sanity-check nil))
 	       "SID=31d4d96e407aad42; Max-age=3600; SameSite=Strict; Partitioned")
-      "max-age, same-site, partitioned")
+      "max-age, same-site, partitioned, secure, no sanity-check")
+  (ok (let ((*sanity-check* nil))
+	(string= (write-set-cookie-header (make-cookie :name "SID" :value "31d4d96e407aad42" :max-age 3600 :same-site "Strict" :partitioned t))
+		 "SID=31d4d96e407aad42; Max-age=3600; SameSite=Strict; Partitioned"))
+      "max-age, same-site, partitioned, secure, no sanity-check")
   (ok (string= (write-set-cookie-header (make-cookie :name "SID" :value "31d4d96e407aad42" :expires (encode-universal-time 6 22 19 25 1 2002 0)
 						     :secure-p t :httponly-p t))
 	       "SID=31d4d96e407aad42; Expires=Fri, 25 Jan 2002 19:22:06 GMT; Secure; HttpOnly")))

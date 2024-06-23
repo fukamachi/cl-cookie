@@ -11,6 +11,7 @@ Key features include:
 - Convert `Set-Cookie` header string into `cookie` instance with `parse-set-cookie-headers`.
 - Serialize `cookie` instances into header strings with `write-cookie-header` and `write-set-cookie-header`.
 - Create `cookie-jar` struct instances with `make-cookie-jar` which allows managing of multiple cookies. You can add multiple cookies to a cookie-jar with `merge-cookies`, or match cookies of certain `host` and `path` with `cookie-jar-host-cookies`.
+- Sanity check for cookie attributes in `make-cookie`, `parse-set-cookie-header`, `write-set-cookie-header`. Can be turned off by setting `*sanity-check*` or `sanity-check` parameter (in `make-cookie` and `parse-set-cookie-header`) to `nil`.
 
 ## Usage
 
@@ -43,6 +44,47 @@ Key features include:
 (cl-cookie:write-set-cookie-header *cookie*)
 ;=> "SID=31d4d96e407aad42; Expires=Fri, 25 Jan 2002 19:22:06 GMT; Max-age=3600;
      Path=/api/; Domain=.example.com; SameSite=Strict; Partitioned; Secure; HttpOnly"
+```
+
+### Sanity Check
+
+If one of the following conditions is true, an error is emitted:
+- Is `name` not supplied?
+- If `secure` is not present:
+  - is `samesite=none`?
+  - is `partitioned` present?
+
+```common-lisp
+(make-cookie :value "asdg")
+;; => Invalid Cookie values: No name supplied.
+;;    You should set at least a dummy name to avoid bugs.
+;;      [Condition of type INVALID-COOKIE]
+```
+```common-lisp
+(make-cookie :name "haalllo" :value "asdg" :same-site "None")
+;; => Invalid Cookie values: Samesite=None cookies require Secure.
+;;      [Condition of type INVALID-COOKIE]
+```
+```common-lisp
+(make-cookie :name "haalllo" :partitioned t)
+;; => Invalid Cookie values: Partitioned cookies require Secure.
+;;      [Condition of type INVALID-COOKIE]
+```
+
+If you want to deactivate sanity checks (e.g. for performance reasons)
+you can either supply parameter `sanity-check` with `nil`, or set
+`*sanity-check*` to `nil`.
+
+```common-lisp
+(make-cookie :name "haalllo" :partitioned t :sanity-check nil)
+;; => #S(COOKIE :NAME "haalllo" :PARTITIONED T
+                :CREATION-TIMESTAMP 3928172572)
+```
+```common-lisp
+(let ((cl-cookie:*sanity-check*))
+  (make-cookie :name "haalllo" :value "asdg" :same-site "None"))
+;; => #S(COOKIE :NAME "haalllo" :VALUE "asdg" :SAME-SITE "None"
+;;              :CREATION-TIMESTAMP 3928172645)
 ```
 
 ### cookie struct accessor functions
