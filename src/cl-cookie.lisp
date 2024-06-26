@@ -89,7 +89,7 @@
   - is partitioned present?"
   (with-slots (name secure-p same-site partitioned)
       cookie
-    (when (string= "" name)
+    (when (or (null name) (string= "" name))
       (error (quote invalid-cookie) :header "No name supplied. You should set at least a dummy name to avoid bugs."))
     (unless secure-p
       (when (string-equal same-site "none")
@@ -183,7 +183,7 @@
 
 (defun write-cookie-header (cookies &optional stream)
   (labels ((write-cookie (cookie s)
-             (format s "~A=~A"
+             (format s "~@[~A~]=~@[~A~]"
                      (cookie-name cookie)
                      (cookie-value cookie)))
            (main (cookies stream)
@@ -209,7 +209,7 @@
                (format-timestring s (universal-to-timestamp universal-time)
                                   :format +set-cookie-date-format+ :timezone local-time:+gmt-zone+))))
     (format stream
-            "~A=~A~@[; Expires=~A~]~@[; Max-age=~A~]~@[; Path=~A~]~@[; Domain=~A~]~@[; SameSite=~A~]~:[~;; Partitioned~]~:[~;; Secure~]~:[~;; HttpOnly~]"
+            "~@[~A~]=~@[~A~]~@[; Expires=~A~]~@[; Max-age=~A~]~@[; Path=~A~]~@[; Domain=~A~]~@[; SameSite=~A~]~:[~;; Partitioned~]~:[~;; Secure~]~:[~;; HttpOnly~]"
             (cookie-name cookie)
             (cookie-value cookie)
             (format-cookie-date (cookie-expires cookie) stream)
