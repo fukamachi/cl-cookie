@@ -28,7 +28,9 @@
            :write-set-cookie-header
            :cookie
            :make-cookie
-           :cookie=
+           :*sanity-check*
+	   :invalid-cookie
+	   :cookie=
            :cookie-equal
            :cookie-name
            :cookie-value
@@ -48,6 +50,8 @@
            :merge-cookies))
 (in-package :cl-cookie)
 
+(defvar *sanity-check* t)
+
 (defun same-site-p (same-site)
   "Predicate for allowed values of same-site attribute"
   (member same-site (list "Strict" "Lax" "None") :test #'string-equal))
@@ -55,7 +59,7 @@
 (deftype same-site nil
   '(satisfies same-site-p))
 
-(defstruct cookie
+(defstruct (cookie (:constructor %make-cookie))
   (name nil :type (or null string))
   (value nil :type (or null string))
   (path nil :type (or null string))
@@ -68,6 +72,45 @@
   (secure-p nil :type boolean)
   (httponly-p nil :type boolean)
   (creation-timestamp (get-universal-time) :type integer :read-only t))
+
+(define-condition invalid-cookie (error)
+  ((header :initarg :header))
+  (:report (lambda (condition stream)
+             (format stream "Invalid Cookie values: ~A"
+                     (slot-value condition 'header)))))
+
+(declaim (ftype (function (cookie) (or null error)) sanity-check)
+	 (inline sanity-check))
+(defun sanity-check (cookie)
+  "If one of the following condition is true, an error is emitted:
+- Is name not supplied?
+- If secure is not present:
+  - is samesite=none?
+  - is partitioned present?"
+  (with-slots (name secure-p same-site partitioned)
+      cookie
+    (when (string= "" name)
+      (error (quote invalid-cookie) :header "No name supplied. You should set at least a dummy name to avoid bugs."))
+    (unless secure-p
+      (when (string-equal same-site "none")
+	(error (quote invalid-cookie) :header "Samesite=None cookies require Secure."))
+      (when partitioned
+	(error (quote invalid-cookie) :header "Partitioned cookies require Secure.")))))
+
+(defun make-cookie (&rest args
+		    &key name value path domain origin-host expires
+		      max-age same-site partitioned secure-p
+		      httponly-p (sanity-check *sanity-check*))
+  "Cookie constructor. Convert "
+  (declare (ignore name value path domain origin-host expires
+		   max-age partitioned secure-p same-site
+		   httponly-p))
+  (remf args :sanity-check)
+  (let ((cookie
+	  (apply (function %make-cookie) args)))
+    (when sanity-check
+      (sanity-check cookie))
+    cookie))
 
 (defstruct cookie-jar
   cookies)
@@ -292,11 +335,13 @@
         (error 'invalid-expires-date
                :expires cookie-date)))))
 
-(defun parse-set-cookie-header (set-cookie-string origin-host origin-path)
+(defun parse-set-cookie-header (set-cookie-string origin-host origin-path
+				&key (sanity-check *sanity-check*))
   "Parse cookie header string and return a cookie struct instance populated with
 the respective slots."
   (check-type origin-host string)
-  (let ((cookie (make-cookie :origin-host origin-host :path origin-path)))
+  (let ((cookie (make-cookie :origin-host origin-host :path origin-path
+			     :sanity-check nil)))
     (handler-case
         (with-vector-parsing (set-cookie-string)
           (bind (name (skip+ (not #\=)))
@@ -342,4 +387,6 @@ the respective slots."
       (invalid-expires-date (e)
         (warn (princ-to-string e))
         (return-from parse-set-cookie-header nil)))
+    (when sanity-check
+      (sanity-check cookie))
     cookie))
