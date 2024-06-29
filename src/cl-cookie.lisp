@@ -1,54 +1,68 @@
 (in-package :cl-user)
 (defpackage cl-cookie
-  (:nicknames :cookie)
-  (:use :cl
-        :proc-parse)
-  (:import-from :quri
-                :cookie-domain-p)
-  (:import-from :local-time
-                :today
-                :timestamp-century
-                :timestamp-to-universal
-                :universal-to-timestamp
-                :format-timestring
-                :encode-timestamp
-                :*abbreviated-subzone-name->timezone-list*
-                :reread-timezone-repository
-                :timezone-subzones
-                :subzone-abbrev
-                :subzone-offset
-                :+gmt-zone+)
-  (:import-from :alexandria
-                :ensure-cons
-		:if-let
-		:when-let
-                :starts-with-subseq)
-  (:export :parse-set-cookie-header
-           :write-cookie-header
-           :write-set-cookie-header
-           :cookie
-           :make-cookie
-           :*sanity-check*
-	   :invalid-cookie
-	   :cookie=
-           :cookie-equal
-           :cookie-name
-           :cookie-value
-           :cookie-expires
-           :cookie-path
-           :cookie-domain
-	   :cookie-same-site
-           :cookie-max-age
-	   :cookie-partitioned
-           :cookie-secure-p
-           :cookie-httponly-p
-           :cookie-origin-host
-           :cookie-jar
-           :make-cookie-jar
-           :cookie-jar-cookies
-           :cookie-jar-host-cookies
-           :merge-cookies))
-(in-package :cl-cookie)
+  (:nicknames #:cookie)
+  (:use #:cl)
+  (:import-from #:asdf
+		#:system-relative-pathname)
+  (:import-from #:proc-parse
+		#:with-vector-parsing
+		#:current
+		#:match?
+		#:match-case
+		#:match-i-case
+		#:match-failed
+		#:bind
+		#:skip
+		#:skip-while
+		#:skip?
+		#:skip+
+		#:skip*)
+  (:import-from #:quri
+		#:cookie-domain-p)
+  (:import-from #:local-time
+                #:today
+                #:timestamp-century
+                #:timestamp-to-universal
+                #:universal-to-timestamp
+                #:format-timestring
+                #:encode-timestamp
+                #:*abbreviated-subzone-name->timezone-list*
+                #:reread-timezone-repository
+                #:timezone-subzones
+                #:subzone-abbrev
+                #:subzone-offset
+                #:+gmt-zone+)
+  (:import-from #:alexandria
+                #:ensure-cons
+		#:if-let
+		#:when-let
+                #:starts-with-subseq)
+  (:export #:parse-set-cookie-header
+           #:write-cookie-header
+           #:write-set-cookie-header
+           #:cookie
+           #:make-cookie
+           #:*sanity-check*
+	   #:invalid-cookie
+	   #:cookie=
+           #:cookie-equal
+           #:cookie-name
+           #:cookie-value
+           #:cookie-expires
+           #:cookie-path
+           #:cookie-domain
+	   #:cookie-same-site
+           #:cookie-max-age
+	   #:cookie-partitioned
+           #:cookie-secure-p
+           #:cookie-httponly-p
+           #:cookie-origin-host
+           #:cookie-jar
+           #:make-cookie-jar
+           #:cookie-jar-cookies
+           #:cookie-jar-host-cookies
+           #:merge-cookies))
+(in-package #:cl-cookie)
 
 (defvar *sanity-check* t)
 
@@ -207,7 +221,7 @@
   (labels ((format-cookie-date (universal-time s)
              (when universal-time
                (format-timestring s (universal-to-timestamp universal-time)
-                                  :format +set-cookie-date-format+ :timezone local-time:+gmt-zone+))))
+                                  :format +set-cookie-date-format+ :timezone +gmt-zone+))))
     (format stream
             "~@[~A~]=~@[~A~]~@[; Expires=~A~]~@[; Max-age=~A~]~@[; Path=~A~]~@[; Domain=~A~]~@[; SameSite=~A~]~:[~;; Partitioned~]~:[~;; Secure~]~:[~;; HttpOnly~]"
             (cookie-name cookie)
@@ -244,18 +258,18 @@
   (char<= #\0 char #\9))
 
 (defun get-tz-offset (tz-abbrev)
-  (symbol-macrolet ((timezones local-time::*abbreviated-subzone-name->timezone-list*))
+  (symbol-macrolet ((timezones *abbreviated-subzone-name->timezone-list*))
     (let* ((tz (gethash tz-abbrev timezones nil))
            (tz (if tz
                    (car tz)
                    (when (zerop (hash-table-count timezones))
-                     (local-time::reread-timezone-repository
-                       :timezone-repository (asdf:system-relative-pathname :local-time #P"zoneinfo/"))
+                     (reread-timezone-repository
+                       :timezone-repository (system-relative-pathname :local-time #P"zoneinfo/"))
                      (first (gethash tz-abbrev timezones nil))))))
       (when tz
-        (loop for sub across (local-time::timezone-subzones tz)
-              when (equal tz-abbrev (local-time::subzone-abbrev sub))
-                do (return (local-time::subzone-offset sub)))))))
+        (loop for sub across (timezone-subzones tz)
+              when (equal tz-abbrev (subzone-abbrev sub))
+                do (return (subzone-offset sub)))))))
 
 (defparameter *current-century-offset*
   (* (1- (timestamp-century (today)))
@@ -328,9 +342,9 @@
               (when (< year 100)
                 (incf year *current-century-offset*))
               (return-from parse-cookie-date
-                (local-time:timestamp-to-universal
-                 (local-time:encode-timestamp 0 sec min hour day month year :timezone local-time:+gmt-zone+
-                                                                            :offset offset))))))
+                (timestamp-to-universal
+                 (encode-timestamp 0 sec min hour day month year :timezone +gmt-zone+
+								 :offset offset))))))
       (error ()
         (error 'invalid-expires-date
                :expires cookie-date)))))
