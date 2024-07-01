@@ -117,9 +117,16 @@
 		      httponly-p (sanity-check *sanity-check*))
   "Cookie constructor. Convert "
   (declare (ignore name value path domain origin-host expires
-		   max-age partitioned secure-p same-site
+		   max-age partitioned secure-p
 		   httponly-p))
   (remf args :sanity-check)
+  (when-let (same-site-value
+	     (and (keywordp same-site)
+		  (ecase same-site
+		    (:lax "Lax")
+		    (:strict "Strict")
+		    (:none "None"))))
+    (setf (getf args :same-site) same-site-value))
   (let ((cookie
 	  (apply (function %make-cookie) args)))
     (when sanity-check
