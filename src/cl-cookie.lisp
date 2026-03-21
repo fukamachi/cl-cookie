@@ -20,8 +20,6 @@
   (:import-from #:quri
 		#:cookie-domain-p)
   (:import-from #:local-time
-                #:today
-                #:timestamp-century
                 #:timestamp-to-universal
                 #:universal-to-timestamp
                 #:format-timestring
@@ -279,7 +277,7 @@
                 do (return (subzone-offset sub)))))))
 
 (defparameter *current-century-offset*
-  (* (1- (timestamp-century (today)))
+  (* (floor (nth-value 5 (get-decoded-time)) 100)
      100))
 
 (defun parse-cookie-date (cookie-date)
