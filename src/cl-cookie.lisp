@@ -150,8 +150,8 @@
   "Equality check as in cookie= plus also secure-p, same-site, partitioned, as well as httponly-p."
   (and (cookie= cookie1 cookie2)
        (eq (cookie-secure-p cookie1) (cookie-secure-p cookie2))
-       (string= (cookie-same-site cookie1)
-		(cookie-same-site cookie2))
+       (equal (cookie-same-site cookie1)
+	      (cookie-same-site cookie2))
        (eq (cookie-partitioned cookie1)
 	   (cookie-partitioned cookie2))
        (eq (cookie-httponly-p cookie1) (cookie-httponly-p cookie2))))
@@ -241,6 +241,7 @@
             (cookie-httponly-p cookie))))
 
 (defun merge-cookies (cookie-jar cookies)
+  (setf cookies (remove nil cookies))
   (setf (cookie-jar-cookies cookie-jar)
         (delete-duplicates
          (nconc (cookie-jar-cookies cookie-jar)
@@ -359,6 +360,8 @@
   "Parse cookie header string and return a cookie struct instance populated with
 the respective slots."
   (check-type origin-host string)
+  (when (zerop (length origin-host))
+    (error "origin-host must not be empty"))
   (let ((cookie (make-cookie :origin-host origin-host :path origin-path
 			     :sanity-check nil)))
     (handler-case
@@ -389,7 +392,17 @@ the respective slots."
                        (setf (cookie-path cookie) path)))
              ("domain" (skip #\=)
                        (bind (domain (skip* (not #\;)))
-                         (setf (cookie-domain cookie) domain)))
+                         (let ((trimmed (string-trim '(#\Space #\Tab) domain)))
+                           (when (plusp (length trimmed))
+                             (let ((lc-domain (string-downcase trimmed))
+                                   (lc-origin (string-downcase origin-host)))
+                               ;; RFC 6265 §5.3 step 6: reject cookie entirely if Domain
+                               ;; attribute does not domain-match the origin host.
+                               (unless (cookie-domain-p lc-origin lc-domain)
+                                 (warn "Rejecting Set-Cookie header ~S: Domain attribute ~S does not domain-match origin host ~S (RFC 6265 §5.3 step 6)"
+                                       set-cookie-string domain origin-host)
+                                 (return-from parse-set-cookie-header nil))
+                               (setf (cookie-domain cookie) lc-domain))))))
              ("samesite" (skip #\=)
                        (bind (samesite (skip* (not #\;)))
                          (setf (cookie-same-site cookie) samesite)))

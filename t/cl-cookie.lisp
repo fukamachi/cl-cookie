@@ -81,7 +81,36 @@
 					     "example.com" "/")
 		    (make-cookie :name "SID" :value "31d4d96e407aad42" :origin-host "example.com" :path "/" :partitioned t :secure-p t :max-age 199999 :same-site "Lax")))
   (ok (signals (cl-cookie:parse-set-cookie-header "SID=31d4d96e407aad42; Path=/; HttpOnly; Partitioned" "example.com" "/")
-	  'invalid-cookie)))
+	  'invalid-cookie))
+  (testing "domain validation (RFC 6265 §5.3 step 6)"
+    (testing "mismatch rejects entire cookie"
+      (ng (parse-set-cookie-header "SID=x; Domain=evil.com" "example.com" "/")
+	  "unrelated domain is rejected")
+      (ng (parse-set-cookie-header "SID=x; Domain=.com" "example.com" "/")
+	  "public suffix domain is rejected"))
+    (testing "valid domain is accepted"
+      (ok (parse-set-cookie-header "SID=x; Domain=example.com" "example.com" "/")
+	  "exact match is accepted")
+      (ok (parse-set-cookie-header "SID=x; Domain=example.com" "sub.example.com" "/")
+	  "subdomain of cookie-domain is accepted")
+      (ok (parse-set-cookie-header "SID=x; Domain=.example.com" "sub.example.com" "/")
+	  "leading-dot domain is accepted"))
+    (testing "empty domain treated as absent"
+      (let ((cookie (parse-set-cookie-header "SID=x; Domain=" "example.com" "/")))
+	(ok cookie "cookie with empty domain is not rejected")
+	(ng (cookie-domain cookie) "empty domain leaves cookie-domain nil")))
+    (testing "domain comparison is case-insensitive"
+      (ok (parse-set-cookie-header "SID=x; Domain=EXAMPLE.COM" "example.com" "/")
+	  "uppercase domain matches lowercase origin"))
+    (testing "whitespace around domain value is stripped (RFC 6265 §5.2 step 5)"
+      (ok (parse-set-cookie-header "SID=x; Domain=example.com " "example.com" "/")
+	  "trailing space in domain is accepted")
+      (ok (parse-set-cookie-header "SID=x; Domain= example.com" "example.com" "/")
+	  "leading space in domain is accepted")))
+  (testing "empty origin-host signals an error rather than crashing"
+    (ok (signals (parse-set-cookie-header "SID=x; Domain=example.com" "" "/")
+	    'simple-error)
+	"empty origin-host raises an error")))
 
 (deftest write-cookie-header
   (ng (write-cookie-header nil))
@@ -171,7 +200,13 @@
     (testing "Cross site cooking"
       (merge-cookies cookie-jar
                      (list (make-cookie :name "name" :value "Ultraman" :domain ".com")))
-      (ng (cookie-jar-host-cookies cookie-jar "hatena.com" "/")))))
+      (ng (cookie-jar-host-cookies cookie-jar "hatena.com" "/")))
+
+    (testing "nil elements from rejected parses are silently ignored"
+      (let ((count-before (length (cookie-jar-cookies cookie-jar))))
+        (merge-cookies cookie-jar (list nil nil))
+        (ok (= (length (cookie-jar-cookies cookie-jar)) count-before)
+            "nil cookies are not added to the jar")))))
 
 (deftest write-set-cookie-header
   (ok (string= (write-set-cookie-header (make-cookie :name "SID" :value "31d4d96e407aad42"))
@@ -208,6 +243,16 @@
   (ok (string= (write-set-cookie-header (make-cookie :name "SID" :value "31d4d96e407aad42" :expires (encode-universal-time 6 22 19 25 1 2002 0)
 						     :secure-p t :httponly-p t))
 	       "SID=31d4d96e407aad42; Expires=Fri, 25 Jan 2002 19:22:06 GMT; Secure; HttpOnly")))
+
+(deftest cookie-equal
+  (testing "both cookies have nil same-site (common case)"
+    (ok (cookie-equal (make-cookie :name "SID" :value "x" :origin-host "example.com")
+		      (make-cookie :name "SID" :value "x" :origin-host "example.com"))
+	"equal cookies with no same-site attribute"))
+  (testing "one cookie has nil same-site and the other has a string"
+    (ng (cookie-equal (make-cookie :name "SID" :value "x" :origin-host "example.com")
+		      (make-cookie :name "SID" :value "x" :origin-host "example.com" :secure-p t :same-site "Lax"))
+	"nil same-site does not equal a string same-site")))
 
 (deftest expired-cookie-p
   (ok (expired-cookie-p
