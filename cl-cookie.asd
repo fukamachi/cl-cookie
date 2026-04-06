@@ -13,7 +13,7 @@
 (in-package :cl-cookie-asd)
 
 (defsystem cl-cookie
-  :version "0.1"
+  :version "0.2.0"
   :author "Eitaro Fukamachi"
   :license "BSD 2-Clause"
   :depends-on (:proc-parse
