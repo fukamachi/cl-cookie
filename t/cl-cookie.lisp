@@ -101,7 +101,12 @@
 	(ng (cookie-domain cookie) "empty domain leaves cookie-domain nil")))
     (testing "domain comparison is case-insensitive"
       (ok (parse-set-cookie-header "SID=x; Domain=EXAMPLE.COM" "example.com" "/")
-	  "uppercase domain matches lowercase origin"))))
+	  "uppercase domain matches lowercase origin"))
+    (testing "whitespace around domain value is stripped (RFC 6265 §5.2 step 5)"
+      (ok (parse-set-cookie-header "SID=x; Domain=example.com " "example.com" "/")
+	  "trailing space in domain is accepted")
+      (ok (parse-set-cookie-header "SID=x; Domain= example.com" "example.com" "/")
+	  "leading space in domain is accepted"))))
 
 (deftest write-cookie-header
   (ng (write-cookie-header nil))
