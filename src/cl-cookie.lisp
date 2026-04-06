@@ -150,8 +150,8 @@
   "Equality check as in cookie= plus also secure-p, same-site, partitioned, as well as httponly-p."
   (and (cookie= cookie1 cookie2)
        (eq (cookie-secure-p cookie1) (cookie-secure-p cookie2))
-       (string= (cookie-same-site cookie1)
-		(cookie-same-site cookie2))
+       (equal (cookie-same-site cookie1)
+	      (cookie-same-site cookie2))
        (eq (cookie-partitioned cookie1)
 	   (cookie-partitioned cookie2))
        (eq (cookie-httponly-p cookie1) (cookie-httponly-p cookie2))))

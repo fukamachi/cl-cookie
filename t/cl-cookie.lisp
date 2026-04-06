@@ -244,6 +244,16 @@
 						     :secure-p t :httponly-p t))
 	       "SID=31d4d96e407aad42; Expires=Fri, 25 Jan 2002 19:22:06 GMT; Secure; HttpOnly")))
 
+(deftest cookie-equal
+  (testing "both cookies have nil same-site (common case)"
+    (ok (cookie-equal (make-cookie :name "SID" :value "x" :origin-host "example.com")
+		      (make-cookie :name "SID" :value "x" :origin-host "example.com"))
+	"equal cookies with no same-site attribute"))
+  (testing "one cookie has nil same-site and the other has a string"
+    (ng (cookie-equal (make-cookie :name "SID" :value "x" :origin-host "example.com")
+		      (make-cookie :name "SID" :value "x" :origin-host "example.com" :secure-p t :same-site "Lax"))
+	"nil same-site does not equal a string same-site")))
+
 (deftest expired-cookie-p
   (ok (expired-cookie-p
        (make-cookie :name "SID" :value "31d4d96e407aad42" :expires (encode-universal-time 6 22 19 25 1 2002 0)
