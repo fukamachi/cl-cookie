@@ -241,6 +241,7 @@
             (cookie-httponly-p cookie))))
 
 (defun merge-cookies (cookie-jar cookies)
+  (setf cookies (remove nil cookies))
   (setf (cookie-jar-cookies cookie-jar)
         (delete-duplicates
          (nconc (cookie-jar-cookies cookie-jar)
@@ -389,7 +390,14 @@ the respective slots."
                        (setf (cookie-path cookie) path)))
              ("domain" (skip #\=)
                        (bind (domain (skip* (not #\;)))
-                         (setf (cookie-domain cookie) domain)))
+                         (when (plusp (length domain))
+                           (let ((lc-domain (string-downcase domain))
+                                 (lc-origin (string-downcase origin-host)))
+                             ;; RFC 6265 §5.3 step 6: reject cookie entirely if Domain
+                             ;; attribute does not domain-match the origin host.
+                             (unless (cookie-domain-p lc-origin lc-domain)
+                               (return-from parse-set-cookie-header nil))
+                             (setf (cookie-domain cookie) lc-domain)))))
              ("samesite" (skip #\=)
                        (bind (samesite (skip* (not #\;)))
                          (setf (cookie-same-site cookie) samesite)))

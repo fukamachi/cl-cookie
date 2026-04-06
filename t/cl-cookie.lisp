@@ -81,7 +81,27 @@
 					     "example.com" "/")
 		    (make-cookie :name "SID" :value "31d4d96e407aad42" :origin-host "example.com" :path "/" :partitioned t :secure-p t :max-age 199999 :same-site "Lax")))
   (ok (signals (cl-cookie:parse-set-cookie-header "SID=31d4d96e407aad42; Path=/; HttpOnly; Partitioned" "example.com" "/")
-	  'invalid-cookie)))
+	  'invalid-cookie))
+  (testing "domain validation (RFC 6265 §5.3 step 6)"
+    (testing "mismatch rejects entire cookie"
+      (ng (parse-set-cookie-header "SID=x; Domain=evil.com" "example.com" "/")
+	  "unrelated domain is rejected")
+      (ng (parse-set-cookie-header "SID=x; Domain=.com" "example.com" "/")
+	  "public suffix domain is rejected"))
+    (testing "valid domain is accepted"
+      (ok (parse-set-cookie-header "SID=x; Domain=example.com" "example.com" "/")
+	  "exact match is accepted")
+      (ok (parse-set-cookie-header "SID=x; Domain=example.com" "sub.example.com" "/")
+	  "subdomain of cookie-domain is accepted")
+      (ok (parse-set-cookie-header "SID=x; Domain=.example.com" "sub.example.com" "/")
+	  "leading-dot domain is accepted"))
+    (testing "empty domain treated as absent"
+      (let ((cookie (parse-set-cookie-header "SID=x; Domain=" "example.com" "/")))
+	(ok cookie "cookie with empty domain is not rejected")
+	(ng (cookie-domain cookie) "empty domain leaves cookie-domain nil")))
+    (testing "domain comparison is case-insensitive"
+      (ok (parse-set-cookie-header "SID=x; Domain=EXAMPLE.COM" "example.com" "/")
+	  "uppercase domain matches lowercase origin"))))
 
 (deftest write-cookie-header
   (ng (write-cookie-header nil))
@@ -171,7 +191,13 @@
     (testing "Cross site cooking"
       (merge-cookies cookie-jar
                      (list (make-cookie :name "name" :value "Ultraman" :domain ".com")))
-      (ng (cookie-jar-host-cookies cookie-jar "hatena.com" "/")))))
+      (ng (cookie-jar-host-cookies cookie-jar "hatena.com" "/")))
+
+    (testing "nil elements from rejected parses are silently ignored"
+      (let ((count-before (length (cookie-jar-cookies cookie-jar))))
+        (merge-cookies cookie-jar (list nil nil))
+        (ok (= (length (cookie-jar-cookies cookie-jar)) count-before)
+            "nil cookies are not added to the jar")))))
 
 (deftest write-set-cookie-header
   (ok (string= (write-set-cookie-header (make-cookie :name "SID" :value "31d4d96e407aad42"))
