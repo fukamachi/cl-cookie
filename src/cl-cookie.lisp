@@ -399,6 +399,8 @@ the respective slots."
                                ;; RFC 6265 §5.3 step 6: reject cookie entirely if Domain
                                ;; attribute does not domain-match the origin host.
                                (unless (cookie-domain-p lc-origin lc-domain)
+                                 (warn "Rejecting Set-Cookie header ~S: Domain attribute ~S does not domain-match origin host ~S (RFC 6265 §5.3 step 6)"
+                                       set-cookie-string domain origin-host)
                                  (return-from parse-set-cookie-header nil))
                                (setf (cookie-domain cookie) lc-domain))))))
              ("samesite" (skip #\=)
