@@ -106,7 +106,11 @@
       (ok (parse-set-cookie-header "SID=x; Domain=example.com " "example.com" "/")
 	  "trailing space in domain is accepted")
       (ok (parse-set-cookie-header "SID=x; Domain= example.com" "example.com" "/")
-	  "leading space in domain is accepted"))))
+	  "leading space in domain is accepted")))
+  (testing "empty origin-host signals an error rather than crashing"
+    (ok (signals (parse-set-cookie-header "SID=x; Domain=example.com" "" "/")
+	    'simple-error)
+	"empty origin-host raises an error")))
 
 (deftest write-cookie-header
   (ng (write-cookie-header nil))

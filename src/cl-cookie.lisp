@@ -360,6 +360,8 @@
   "Parse cookie header string and return a cookie struct instance populated with
 the respective slots."
   (check-type origin-host string)
+  (when (zerop (length origin-host))
+    (error "origin-host must not be empty"))
   (let ((cookie (make-cookie :origin-host origin-host :path origin-path
 			     :sanity-check nil)))
     (handler-case
